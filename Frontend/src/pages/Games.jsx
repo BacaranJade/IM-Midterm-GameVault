@@ -4,29 +4,57 @@ import { gameApi, GENRES, PLATFORMS } from '../services/gameApi.js'
 
 export default function Games() {
   const [games, setGames] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [genre, setGenre] = useState('')
   const [platform, setPlatform] = useState('')
   const [sort, setSort] = useState('title')
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const fetchGames = useCallback((params) => {
+    // Only trigger full loading state on the initial request if no games are rendered
+    setGames((currentGames) => {
+      if (currentGames.length === 0) {
+        setLoading(true)
+      }
+      return currentGames
+    })
+    
     setError('')
     gameApi
-      .getGames({ search, genre, platform, sort })
+      .getGames(params)
       .then((data) => {
-        setGames(data.data || [])
+        const gameList = Array.isArray(data) ? data : data?.data || []
+        setGames(gameList)
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(e?.message || 'Failed to load games.'))
       .finally(() => setLoading(false))
-  }, [search, genre, platform, sort])
+  }, [])
 
   useEffect(() => {
-    const timer = setTimeout(load, 250)
+    const timer = setTimeout(() => {
+      fetchGames({ search, genre, platform, sort })
+    }, 250)
+
     return () => clearTimeout(timer)
-  }, [load])
+  }, [search, genre, platform, sort, fetchGames])
+
+  const handleStatusChange = async (gameId, newStatus) => {
+    setGames((prevGames) =>
+      prevGames.map((game) =>
+        game.id === gameId ? { ...game, status: newStatus } : game
+      )
+    )
+
+    try {
+      if (gameApi.updateGame) {
+        await gameApi.updateGame(gameId, { status: newStatus })
+      }
+    } catch (err) {
+      console.error('Failed to update game status:', err)
+      fetchGames({ search, genre, platform, sort })
+    }
+  }
 
   return (
     <div className="page">
@@ -63,8 +91,10 @@ export default function Games() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {loading ? (
-        <div className="loading">Loading…</div>
+      {loading && games.length === 0 ? (
+        <div className="empty">
+          <p>Loading games...</p>
+        </div>
       ) : games.length === 0 ? (
         <div className="empty">
           <p>No games match your filters.</p>
@@ -72,7 +102,11 @@ export default function Games() {
       ) : (
         <div className="cards-grid">
           {games.map((game) => (
-            <GameCard key={game.id} game={game} />
+            <GameCard 
+              key={game.id} 
+              game={game} 
+              onStatusChange={handleStatusChange} 
+            />
           ))}
         </div>
       )}

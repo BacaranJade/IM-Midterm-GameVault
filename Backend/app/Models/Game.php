@@ -25,6 +25,7 @@ class Game extends Model
         'status',
         'cover_url',
         'description',
+        'user_id', // Added user_id so mass assignment works
     ];
 
     /**
@@ -38,4 +39,12 @@ class Game extends Model
     ];
 
     public const STATUSES = ['wishlist', 'playing', 'completed', 'backlog'];
+
+    /**
+     * Get the user that owns the game.
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

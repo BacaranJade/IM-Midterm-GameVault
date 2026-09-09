@@ -1,9 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 async function request(path, options = {}) {
+  const token = localStorage.getItem('auth_token')
+
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,
@@ -39,16 +43,26 @@ export const gameApi = {
   },
 
   createGame(game) {
+    // Automatically convert status to lowercase to match Laravel validation
+    const payload = {
+      ...game,
+      status: game.status ? game.status.toLowerCase() : undefined,
+    }
     return request('/games', {
       method: 'POST',
-      body: JSON.stringify(game),
+      body: JSON.stringify(payload),
     })
   },
 
   updateGame(id, game) {
+    // Automatically convert status to lowercase to match Laravel validation
+    const payload = {
+      ...game,
+      status: game.status ? game.status.toLowerCase() : undefined,
+    }
     return request(`/games/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(game),
+      body: JSON.stringify(payload),
     })
   },
 

@@ -1,24 +1,44 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { gameApi, GENRES, PLATFORMS, STATUSES } from '../services/gameApi.js'
+import { GENRES, PLATFORMS, STATUSES } from '../services/gameApi.js'
 
-const empty = {
+const safeGenres = Array.isArray(GENRES) ? GENRES : ['Action', 'Adventure', 'RPG', 'Platformer', 'Other']
+const safePlatforms = Array.isArray(PLATFORMS) ? PLATFORMS : ['PC', 'Nintendo Switch', 'PlayStation 5', 'Xbox']
+const safeStatuses = Array.isArray(STATUSES) ? STATUSES : ['Wishlist', 'Playing', 'Completed', 'Paused']
+
+const emptyForm = {
   title: '',
   genre: '',
   platform: '',
   developer: '',
   release_year: '',
   rating: '',
-  status: 'wishlist',
+  status: 'Wishlist',
   cover_url: '',
   description: '',
 }
 
-export default function GameForm({ initial, onSubmit, submitLabel }) {
+export default function GameForm({ initial, onSubmit, submitLabel = 'Submit' }) {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ ...empty, ...(initial || {}) })
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (initial) {
+      setForm({
+        title: initial.title || '',
+        genre: initial.genre || '',
+        platform: initial.platform || '',
+        developer: initial.developer || '',
+        release_year: initial.release_year || '',
+        rating: initial.rating || '',
+        status: initial.status || 'Wishlist',
+        cover_url: initial.cover_url || '',
+        description: initial.description || '',
+      })
+    }
+  }, [initial])
 
   function handleChange(e) {
     const { name, value } = e.target
@@ -33,7 +53,7 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
       await onSubmit(form)
       navigate('/games')
     } catch (err) {
-      setError(err.message)
+      setError(err?.message || 'An error occurred while saving.')
     } finally {
       setSaving(false)
     }
@@ -44,7 +64,6 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="form-section">
-        <h3>About the game</h3>
         <div className="form-grid">
           <label className="field field-wide">
             <span>Title *</span>
@@ -52,16 +71,18 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
               name="title"
               value={form.title}
               onChange={handleChange}
-              required
               placeholder="e.g. Elden Ring"
+              required
             />
           </label>
 
           <label className="field">
             <span>Genre *</span>
             <select name="genre" value={form.genre} onChange={handleChange} required>
-              <option value="">Select genre…</option>
-              {GENRES.map((g) => (
+              <option value="" disabled hidden>
+                Select Genre
+              </option>
+              {safeGenres.map((g) => (
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>
@@ -70,8 +91,10 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
           <label className="field">
             <span>Platform *</span>
             <select name="platform" value={form.platform} onChange={handleChange} required>
-              <option value="">Select platform…</option>
-              {PLATFORMS.map((p) => (
+              <option value="" disabled hidden>
+                Select Platform
+              </option>
+              {safePlatforms.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
@@ -88,12 +111,10 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
           </label>
 
           <label className="field">
-            <span>Release year</span>
+            <span>Release Year</span>
             <input
               name="release_year"
               type="number"
-              min="1950"
-              max="2100"
               value={form.release_year}
               onChange={handleChange}
               placeholder="e.g. 2022"
@@ -101,35 +122,37 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
           </label>
 
           <label className="field">
-            <span>Rating (0–5)</span>
+            <span>Rating</span>
             <input
               name="rating"
               type="number"
-              min="0"
-              max="5"
               step="0.1"
+              min="0"
+              max="10"
               value={form.rating}
               onChange={handleChange}
-              placeholder="e.g. 4.5"
+              placeholder="e.g. 9.5"
             />
           </label>
 
           <label className="field">
             <span>Status</span>
             <select name="status" value={form.status} onChange={handleChange}>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
+              {safeStatuses.map((s) => {
+                const val = typeof s === 'object' ? s.value : s
+                const lbl = typeof s === 'object' ? s.label : s
+                return <option key={val} value={val}>{lbl}</option>
+              })}
             </select>
           </label>
 
           <label className="field field-wide">
-            <span>Cover image URL</span>
+            <span>Cover Image URL</span>
             <input
               name="cover_url"
               value={form.cover_url}
               onChange={handleChange}
-              placeholder="https://…/cover.jpg (optional)"
+              placeholder="https://example.com/cover.jpg"
             />
           </label>
 
@@ -139,19 +162,15 @@ export default function GameForm({ initial, onSubmit, submitLabel }) {
               name="description"
               value={form.description}
               onChange={handleChange}
+              placeholder="Brief description or notes about the game..."
               rows="4"
-              placeholder="A short summary of the game…"
             />
           </label>
         </div>
       </div>
 
-      <div className="form-actions">
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => navigate(-1)}
-        >
+      <div className="form-actions" style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+        <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)}>
           Cancel
         </button>
         <button type="submit" className="btn btn-primary" disabled={saving}>

@@ -16,7 +16,8 @@ class GameController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Game::query();
+        // Scope queries exclusively to the authenticated user's games
+        $query = $request->user()->games();
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -49,11 +50,11 @@ class GameController extends Controller
         return response()->json([
             'data' => $games,
             'counts' => [
-                'total' => Game::count(),
-                'completed' => Game::where('status', 'completed')->count(),
-                'playing' => Game::where('status', 'playing')->count(),
-                'wishlist' => Game::where('status', 'wishlist')->count(),
-                'backlog' => Game::where('status', 'backlog')->count(),
+                'total' => $request->user()->games()->count(),
+                'completed' => $request->user()->games()->where('status', 'completed')->count(),
+                'playing' => $request->user()->games()->where('status', 'playing')->count(),
+                'wishlist' => $request->user()->games()->where('status', 'wishlist')->count(),
+                'backlog' => $request->user()->games()->where('status', 'backlog')->count(),
             ],
         ]);
     }
@@ -62,20 +63,32 @@ class GameController extends Controller
     {
         $data = $request->validated();
 
-        if (!empty($data['cover_url'])) {
+        // 1. Direct File Upload (multipart/form-data)
+        if ($request->hasFile('cover')) {
+            $path = $request->file('cover')->store('games', 'public');
+            $data['cover_url'] = asset('storage/' . $path);
+        } 
+        // 2. URL Link Fallback (JSON/URL download)
+        elseif (!empty($data['cover_url'])) {
             $data['cover_url'] = $this->downloadCover(
                 $data['cover_url'],
                 $data['title']
             );
         }
 
-        $game = Game::create($data);
+        // Automatically associate the game with the authenticated user
+        $game = $request->user()->games()->create($data);
 
         return response()->json($game, 201);
     }
 
-    public function show(Game $game): JsonResponse
+    public function show(Request $request, Game $game): JsonResponse
     {
+        // Ensure user can only view their own game
+        if ($game->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         return response()->json($game);
     }
 
@@ -83,11 +96,23 @@ class GameController extends Controller
         UpdateGameRequest $request,
         Game $game
     ): JsonResponse {
+        // Ensure user can only update their own game
+        if ($game->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $data = $request->validated();
+        $oldCover = $game->cover_url;
 
-        if (!empty($data['cover_url'])) {
-            $oldCover = $game->cover_url;
+        // 1. Direct File Upload
+        if ($request->hasFile('cover')) {
+            $path = $request->file('cover')->store('games', 'public');
+            $data['cover_url'] = asset('storage/' . $path);
 
+            $this->deleteOldLocalCover($oldCover);
+        } 
+        // 2. URL Link Fallback
+        elseif (!empty($data['cover_url'])) {
             $newCover = $this->downloadCover(
                 $data['cover_url'],
                 $data['title'] ?? $game->title
@@ -95,14 +120,8 @@ class GameController extends Controller
 
             $data['cover_url'] = $newCover;
 
-            // Delete old local image after successful replacement
-            if (
-                $newCover !== $oldCover &&
-                $oldCover &&
-                Str::startsWith($oldCover, '/storage/games/')
-            ) {
-                $oldPath = Str::after($oldCover, '/storage/');
-                Storage::disk('public')->delete($oldPath);
+            if ($newCover !== $oldCover) {
+                $this->deleteOldLocalCover($oldCover);
             }
         }
 
@@ -111,19 +130,29 @@ class GameController extends Controller
         return response()->json($game);
     }
 
-    public function destroy(Game $game): JsonResponse
+    public function destroy(Request $request, Game $game): JsonResponse
     {
-        if (
-            $game->cover_url &&
-            Str::startsWith($game->cover_url, '/storage/games/')
-        ) {
-            $path = Str::after($game->cover_url, '/storage/');
-            Storage::disk('public')->delete($path);
+        // Ensure user can only delete their own game
+        if ($game->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
+
+        $this->deleteOldLocalCover($game->cover_url);
 
         $game->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Helper to safely remove an old image from local storage.
+     */
+    private function deleteOldLocalCover(?string $oldCover): void
+    {
+        if ($oldCover && Str::contains($oldCover, '/storage/games/')) {
+            $oldPath = 'games/' . Str::after($oldCover, '/storage/games/');
+            Storage::disk('public')->delete($oldPath);
+        }
     }
 
     /**
@@ -134,7 +163,7 @@ class GameController extends Controller
         string $title
     ): string {
         // Already a local image
-        if (Str::startsWith($imageUrl, '/storage/games/')) {
+        if (Str::contains($imageUrl, '/storage/games/')) {
             return $imageUrl;
         }
 
@@ -172,10 +201,6 @@ class GameController extends Controller
                 default => null,
             };
 
-            /*
-             * Some image servers don't return a proper Content-Type.
-             * Try to determine the extension from the URL instead.
-             */
             if (!$extension) {
                 $urlPath = parse_url($imageUrl, PHP_URL_PATH);
                 $urlExtension = strtolower(
@@ -215,7 +240,7 @@ class GameController extends Controller
                 'file' => $filename,
             ]);
 
-            return '/storage/games/' . $filename;
+            return asset('storage/games/' . $filename);
 
         } catch (\Throwable $e) {
             Log::error('GameVault image download exception', [
