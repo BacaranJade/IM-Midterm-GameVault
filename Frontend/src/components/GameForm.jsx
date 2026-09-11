@@ -131,7 +131,7 @@ export default function GameForm({ initial, onSubmit, submitLabel = 'Submit' }) 
               max="10"
               value={form.rating}
               onChange={handleChange}
-              placeholder="e.g. 9.5"
+              placeholder="e.g. 4.5"
             />
           </label>
 

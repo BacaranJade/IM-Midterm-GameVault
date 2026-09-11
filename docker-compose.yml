@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: gamevault_mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: gamevault
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_USER: gamevault
-      MYSQL_PASSWORD: gamevault
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   backend:
     build:
@@ -26,20 +8,16 @@ services:
       dockerfile: Dockerfile
     container_name: gamevault_backend
     restart: unless-stopped
-    environment:
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: gamevault
-      DB_USERNAME: gamevault
-      DB_PASSWORD: gamevault
-    depends_on:
-      mysql:
-        condition: service_healthy
+
+    env_file:
+      - ./Backend/.env
+
     ports:
       - "8000:8000"
+
     volumes:
       - ./Backend:/var/www/html
+
     working_dir: /var/www/html
 
   frontend:
@@ -48,13 +26,13 @@ services:
       dockerfile: Dockerfile
     container_name: gamevault_frontend
     restart: unless-stopped
+
     ports:
       - "3000:3000"
+
     volumes:
       - ./Frontend:/app
       - /app/node_modules
+
     depends_on:
       - backend
-
-volumes:
-  mysql_data:

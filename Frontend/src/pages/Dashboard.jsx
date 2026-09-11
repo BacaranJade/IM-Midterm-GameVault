@@ -34,7 +34,8 @@ export default function Dashboard({ games = [], onStatusChange }) {
           gridTemplateColumns: '2fr 1fr', 
           gap: '24px', 
           marginBottom: '32px',
-          width: '100%' 
+          width: '100%',
+          alignItems: 'stretch' // Ensures grid items stretch equally
         }}
       >
         {/* Featured Hero Banner */}
@@ -52,9 +53,9 @@ export default function Dashboard({ games = [], onStatusChange }) {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'flex-end',
-              alignItems: 'flex-start', // Forces left alignment inside hero
+              alignItems: 'flex-start',
               padding: '32px',
-              textAlign: 'left' // Prevents text-align: center inheritance
+              textAlign: 'left'
             }}
           >
             <div 
@@ -73,7 +74,7 @@ export default function Dashboard({ games = [], onStatusChange }) {
                 zIndex: 2,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-start', // Forces badge, title, button to align left
+                alignItems: 'flex-start',
                 maxWidth: '600px'
               }}
             >
@@ -129,12 +130,26 @@ export default function Dashboard({ games = [], onStatusChange }) {
             padding: '24px', 
             border: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            maxHeight: '344px', // Matches height nicely with the hero section
+            boxSizing: 'border-box'
           }}
         >
-          <h3 style={{ marginTop: 0, marginBottom: '16px', color: '#fff', fontSize: '1.1rem' }}>In Library</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {safeGames.slice(0, 4).map((game) => (
+          <h3 style={{ marginTop: 0, marginBottom: '16px', color: '#fff', fontSize: '1.1rem', flexShrink: 0 }}>In Library</h3>
+          
+          {/* Scrollable Container */}
+          <div 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '12px', 
+              overflowY: 'auto', 
+              paddingRight: '4px',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#3a2d54 #161124'
+            }}
+          >
+            {safeGames.map((game) => (
               <div 
                 key={game.id} 
                 className="library-item" 
@@ -144,7 +159,8 @@ export default function Dashboard({ games = [], onStatusChange }) {
                   gap: '12px', 
                   background: '#221a35', 
                   padding: '10px 12px', 
-                  borderRadius: '8px' 
+                  borderRadius: '8px',
+                  flexShrink: 0
                 }}
               >
                 <img 
